@@ -1,0 +1,21 @@
+method: SetConfig
+request:
+  ports:
+  - location: Ethernet1
+    name: p1
+---
+method: SetControlState
+request:
+  choice: protocol
+  protocol:
+    choice: all
+    all:
+      state: start
+---
+method: SetControlState
+request:
+  choice: protocol
+  protocol:
+    choice: all
+    all:
+      state: stop

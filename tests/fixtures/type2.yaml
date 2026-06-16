@@ -1,0 +1,13 @@
+ports:
+- location: Ethernet1
+  name: p1
+- location: Ethernet3
+  name: p2
+flows:
+- name: f1
+  tx_rx:
+    choice: port
+    port:
+      tx_name: p1
+      rx_names:
+      - p2

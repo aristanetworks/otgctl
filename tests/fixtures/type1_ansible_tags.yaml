@@ -1,0 +1,15 @@
+---
+method: set_config
+request:
+  devices:
+  - ethernets:
+    - ipv4_addresses:
+      - address: 192.168.0.2
+        gateway: !!python/object/apply:ansible.utils.unsafe_proxy.AnsibleUnsafeText
+        - 192.168.0.1
+        name: Ipv4 Port 0
+      name: Ethernet Port 0
+    name: Device Port 0
+  ports:
+  - location: Ethernet1
+    name: Port 0

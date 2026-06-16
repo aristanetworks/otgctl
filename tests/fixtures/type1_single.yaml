@@ -1,0 +1,25 @@
+method: SetConfig
+request:
+  ports:
+  - location: Ethernet1
+    name: p1
+  - location: Ethernet3
+    name: p2
+  flows:
+  - name: f1
+    tx_rx:
+      choice: port
+      port:
+        tx_name: p1
+        rx_names:
+        - p2
+    size:
+      choice: fixed
+      fixed: 128
+    rate:
+      choice: pps
+      pps: '100'
+    duration:
+      choice: fixed_packets
+      fixed_packets:
+        packets: 1000
