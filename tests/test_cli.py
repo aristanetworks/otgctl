@@ -22,7 +22,7 @@ import pytest
 
 import yaml
 
-from otgctl.cli import main
+from otgctl.cli import build_parser, main
 from tests.constants import FIXTURES, TYPE1_SINGLE_BODY, TYPE2_BODY
 
 
@@ -38,6 +38,60 @@ def make_mock_response(
         body = {}
     resp.content = json.dumps(body).encode()
     return resp
+
+
+class TestBuildParserServer:
+    def test_default_server(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=True):
+            parser = build_parser()
+        args = parser.parse_args(["-m", "GetVersion"])
+        assert args.server == "https://localhost:8443"
+
+    def test_otg_api_env(self) -> None:
+        with mock.patch.dict(os.environ, {"OTG_API": "https://myhost:9443"}):
+            parser = build_parser()
+        args = parser.parse_args(["-m", "GetVersion"])
+        assert args.server == "https://myhost:9443"
+
+    def test_flag_overrides_env(self) -> None:
+        with mock.patch.dict(os.environ, {"OTG_API": "https://myhost:9443"}):
+            parser = build_parser()
+        args = parser.parse_args(["-s", "https://explicit:1234", "-m", "GetVersion"])
+        assert args.server == "https://explicit:1234"
+
+
+class TestBuildParserInsecure:
+    def test_default_insecure(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=True):
+            parser = build_parser()
+        args = parser.parse_args(["-m", "GetVersion"])
+        assert args.insecure == False
+
+    @pytest.mark.parametrize("val", ["true", "True", "TRUE", "1"])
+    def test_otg_insecure_truthy(self, val: str) -> None:
+        with mock.patch.dict(os.environ, {"OTG_INSECURE": val}):
+            parser = build_parser()
+        args = parser.parse_args(["-m", "GetVersion"])
+        assert args.insecure == True
+
+    @pytest.mark.parametrize("val", ["false", "False", "FALSE", "f", "F", "0"])
+    def test_otg_insecure_falsy(self, val: str) -> None:
+        with mock.patch.dict(os.environ, {"OTG_INSECURE": val}):
+            parser = build_parser()
+        args = parser.parse_args(["-m", "GetVersion"])
+        assert args.insecure == False
+
+    def test_flag_sets_insecure(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=True):
+            parser = build_parser()
+        args = parser.parse_args(["-k", "-m", "GetVersion"])
+        assert args.insecure == True
+
+    def test_flag_overrides_falsy_env(self) -> None:
+        with mock.patch.dict(os.environ, {"OTG_INSECURE": "false"}):
+            parser = build_parser()
+        args = parser.parse_args(["-k", "-m", "GetVersion"])
+        assert args.insecure == True
 
 
 class TestCliType1:

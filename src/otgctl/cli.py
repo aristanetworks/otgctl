@@ -43,8 +43,10 @@ def build_parser() -> argparse.ArgumentParser:
         default="yaml",
         help="Output format (default: yaml)",
     )
+    insecure=os.environ.get("OTG_INSECURE","false").lower()
     parser.add_argument(
         "-k", "--insecure",
+        default=insecure not in ('false', 'f', '0'),
         action="store_true",
         help="Skip TLS certificate verification",
     )

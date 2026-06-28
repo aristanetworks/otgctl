@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `$OTG_INSECURE` environment variable for command-line `-k`
+
 ## [0.9.0] - 2026-06-16
 
 ### Added
