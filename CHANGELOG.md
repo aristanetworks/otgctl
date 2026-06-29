@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 - `$OTG_INSECURE` environment variable for command-line `-k`
 
+### Changed
+- Use proper syntax for license in pyproject.toml
+- Downgrade dependencies to those available in EOS
+
 ## [0.9.0] - 2026-06-16
 
 ### Added
