@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - Use proper syntax for license in pyproject.toml
 - Downgrade dependencies to those available in EOS
+- Added --version
 
 ## [0.9.0] - 2026-06-16
 

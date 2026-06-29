@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import os
 import sys
 
@@ -24,9 +25,18 @@ from otgctl.methods import METHOD_MAP, resolve_method
 
 
 def build_parser() -> argparse.ArgumentParser:
+    try:
+        version = importlib.metadata.version("otgctl")
+    except importlib.metadata.PackageNotFoundError:
+        version = "dev"
     parser = argparse.ArgumentParser(
         prog="otgctl",
-        description="Make OTG REST API calls from YAML/JSON input.",
+        description=f"otgctl {version} — Make OTG REST API calls from YAML/JSON input.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {version}",
     )
     parser.add_argument(
         "-s", "--server",
