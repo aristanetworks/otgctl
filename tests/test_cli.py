@@ -227,6 +227,20 @@ class TestCliNoSources:
 
 
 class TestCliErrors:
+    @mock.patch("otgctl.client.requests.request")
+    def test_http_error_exits_nonzero(
+        self, mock_request: mock.MagicMock, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        mock_request.return_value = make_mock_response(
+            status=404, body={"detail": "not found"})
+        with pytest.raises(SystemExit) as exc_info:
+            main(["-s", "https://test:8443", "-m", "GetVersion"])
+        assert exc_info.value.code == 1
+
+        out = capsys.readouterr().out
+        assert "HTTP 404" in out
+        assert "not found" in out
+
     def test_no_sources(self, capsys: pytest.CaptureFixture[str]) -> None:
         try:
             main([])

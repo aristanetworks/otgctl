@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Use proper syntax for license in pyproject.toml
 - Downgrade dependencies to those available in EOS
 - Added --version
+- Exit with status 1 for non-2xx HTTP responses
 
 ## [0.9.0] - 2026-06-16
 

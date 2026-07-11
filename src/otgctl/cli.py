@@ -141,6 +141,8 @@ def main(argv: list[str] | None = None) -> None:
         text, binary = format_response(
             status, headers, content, args.output_format)
         print_response(text, binary)
+        if not 200 <= status < 300:
+            sys.exit(1)
 
 
 if __name__ == "__main__":
