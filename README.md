@@ -11,7 +11,7 @@ pip install .
 ## Usage
 
 ```
-otgctl [-s SERVER] [-m METHOD] [-o json] [-k] [-v] [--cert FILE] [--key FILE] [--list-methods] FILE_OR_STRING ...
+otgctl [-s SERVER] [-m METHOD] [-o json] [-k] [-v] [--cert FILE] [--key FILE] [--timeout SECONDS] [--list-methods] FILE_OR_STRING ...
 ```
 
 ### Options
@@ -25,13 +25,31 @@ otgctl [-s SERVER] [-m METHOD] [-o json] [-k] [-v] [--cert FILE] [--key FILE] [-
 | `-v`, `--verbose` | Print request and response details to stderr |
 | `--cert` | Client certificate file for mTLS |
 | `--key` | Client private key file for mTLS (optional if cert file contains both) |
+| `--timeout` | HTTP request timeout in seconds (default: 30) |
 | `--list-methods` | List available method names for `-m` and exit |
+| `--version` | Print the code version and exit |
 
 For GET methods (GetConfig, GetVersion), input files can be omitted:
 
 ```
 otgctl -m GetVersion
 ```
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `OTG_API` | default server URL |
+| `OTG_INSECURE` | when set to `true`, `1`, or another non-false value, behaves like `-k` |
+
+### Exit Codes
+
+Exit codes:
+
+- `0`: all requests completed with 2xx HTTP status.
+- `1`: input parsing failed, method resolution failed, request execution
+  failed, or an HTTP response was non-2xx.
+- `2`: command-line usage error from argparse.
 
 ### Input formats
 
@@ -123,6 +141,14 @@ choice: flow
 ```
 
 The `//` prefix distinguishes an API path from a file path, so there is no ambiguity with files that start with `/`.
+
+##### API path syntax limitations
+
+The `//` API-path syntax is intended for simple string-valued requests. It does
+not perform YAML/JSON type conversion: values are sent as strings, except that
+comma-separated values and keys ending in `s` become lists of strings. Use YAML
+or JSON input when you need booleans, numbers, nested arrays, escaping commas,
+or more complex request bodies.
 
 #### Stdin
 

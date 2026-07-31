@@ -19,6 +19,7 @@ import json
 from unittest import mock
 
 import pytest
+import requests
 import yaml
 
 from otgctl.client import execute_request, format_response, print_response
@@ -71,6 +72,13 @@ class TestFormatResponse:
         assert text == "some plain text"
         assert binary is None
 
+    def test_invalid_json_falls_back_to_text(self) -> None:
+        headers = {"Content-Type": "application/json"}
+        text, binary = format_response(
+            200, headers, b"{not valid json", "yaml")
+        assert text == "{not valid json"
+        assert binary is None
+
 
 class TestPrintResponse:
     def test_text_output(self, capsys: pytest.CaptureFixture[str]) -> None:
@@ -115,7 +123,7 @@ class TestExecuteRequest:
         assert status == 200
         mock_request.assert_called_once_with(
             "POST", "https://localhost:8443/config",
-            verify=False, json={"ports": []},
+            timeout=30.0, verify=False, json={"ports": []},
         )
 
     @mock.patch("otgctl.client.requests.request")
@@ -131,7 +139,7 @@ class TestExecuteRequest:
             None, insecure=False,
         )
         mock_request.assert_called_once_with(
-            "GET", "https://localhost:8443/config",
+            "GET", "https://localhost:8443/config", timeout=30.0,
         )
 
     @mock.patch("otgctl.client.requests.request")
@@ -148,8 +156,33 @@ class TestExecuteRequest:
         )
         mock_request.assert_called_once_with(
             "POST", "https://localhost:8443/config",
-            cert=("client.crt", "client.key"), json={"ports": []},
+            timeout=30.0, cert=("client.crt", "client.key"), json={"ports": []},
         )
+
+    @mock.patch("otgctl.client.requests.request")
+    def test_custom_timeout(self, mock_request: mock.MagicMock) -> None:
+        mock_resp = mock.MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.headers = {"Content-Type": "application/json"}
+        mock_resp.content = b'{}'
+        mock_request.return_value = mock_resp
+
+        execute_request(
+            "https://localhost:8443", "GET", "/config",
+            None, timeout=5.0,
+        )
+        mock_request.assert_called_once_with(
+            "GET", "https://localhost:8443/config", timeout=5.0,
+        )
+
+    @mock.patch("otgctl.client.requests.request")
+    def test_request_timeout_propagates(
+        self, mock_request: mock.MagicMock,
+    ) -> None:
+        mock_request.side_effect = requests.exceptions.Timeout("timed out")
+
+        with pytest.raises(requests.exceptions.Timeout, match="timed out"):
+            execute_request("https://localhost:8443", "GET", "/config", None)
 
     @mock.patch("otgctl.client.requests.request")
     def test_verbose_prints_request_and_response(
@@ -221,5 +254,5 @@ class TestExecuteRequest:
         )
         mock_request.assert_called_once_with(
             "POST", "https://localhost:8443/config",
-            cert="combined.pem",
+            timeout=30.0, cert="combined.pem",
         )

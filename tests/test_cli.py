@@ -19,6 +19,7 @@ import os
 from unittest import mock
 
 import pytest
+import requests
 
 import yaml
 
@@ -92,6 +93,18 @@ class TestBuildParserInsecure:
             parser = build_parser()
         args = parser.parse_args(["-k", "-m", "GetVersion"])
         assert args.insecure == True
+
+
+class TestBuildParserTimeout:
+    def test_default_timeout(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["-m", "GetVersion"])
+        assert args.timeout == 30.0
+
+    def test_timeout_flag(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["--timeout", "5", "-m", "GetVersion"])
+        assert args.timeout == 5.0
 
 
 class TestCliType1:
@@ -195,6 +208,49 @@ class TestCliServerDefault:
         assert mock_request.call_args[0] == ("GET", "https://env-server:9443/capabilities/version")
 
 
+class TestCliRequestOptions:
+    @mock.patch("otgctl.client.requests.request")
+    def test_timeout_passed_to_request(self, mock_request: mock.MagicMock) -> None:
+        mock_request.return_value = make_mock_response()
+
+        main(["-s", "https://test:8443", "--timeout", "5", "-m", "GetVersion"])
+
+        assert mock_request.call_args[1]["timeout"] == 5.0
+
+    @mock.patch("otgctl.client.requests.request")
+    def test_mtls_cert_and_key_passed_to_request(
+        self, mock_request: mock.MagicMock,
+    ) -> None:
+        mock_request.return_value = make_mock_response()
+        path = os.path.join(FIXTURES, "type2.yaml")
+
+        main([
+            "-s", "https://test:8443",
+            "--cert", "client.crt",
+            "--key", "client.key",
+            "-m", "SetConfig",
+            path,
+        ])
+
+        assert mock_request.call_args[1]["cert"] == ("client.crt", "client.key")
+
+    @mock.patch("otgctl.client.requests.request")
+    def test_mtls_cert_only_passed_to_request(
+        self, mock_request: mock.MagicMock,
+    ) -> None:
+        mock_request.return_value = make_mock_response()
+        path = os.path.join(FIXTURES, "type2.yaml")
+
+        main([
+            "-s", "https://test:8443",
+            "--cert", "client.pem",
+            "-m", "SetConfig",
+            path,
+        ])
+
+        assert mock_request.call_args[1]["cert"] == "client.pem"
+
+
 class TestCliListMethods:
     def test_list_methods(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit) as exc_info:
@@ -225,6 +281,16 @@ class TestCliNoSources:
         err = capsys.readouterr().err
         assert "No input sources" in err
 
+    def test_unknown_method_no_sources(
+        self, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            main(["-s", "https://test:8443", "-m", "DoSomething"])
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "Unknown method" in err
+        assert "DoSomething" in err
+
 
 class TestCliErrors:
     @mock.patch("otgctl.client.requests.request")
@@ -240,6 +306,117 @@ class TestCliErrors:
         out = capsys.readouterr().out
         assert "HTTP 404" in out
         assert "not found" in out
+
+    @mock.patch("otgctl.cli.execute_request")
+    def test_request_execution_error_exits_nonzero(
+        self,
+        mock_execute_request: mock.MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        mock_execute_request.side_effect = RuntimeError("connection failed")
+
+        with pytest.raises(SystemExit) as exc_info:
+            main(["-s", "https://test:8443", "-m", "GetVersion"])
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "Error: connection failed" in err
+
+    @mock.patch("otgctl.cli.execute_request")
+    def test_connect_timeout_error_is_simplified(
+        self,
+        mock_execute_request: mock.MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        mock_execute_request.side_effect = requests.exceptions.ConnectTimeout(
+            "raw timeout details")
+
+        with pytest.raises(SystemExit) as exc_info:
+            main([
+                "-s", "https://10.0.0.0:9999",
+                "--timeout", "5",
+                "-m", "GetConfig",
+            ])
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert err == (
+            "Error: connection to https://10.0.0.0:9999/config "
+            "timed out after 5s\n")
+
+    @mock.patch("otgctl.cli.execute_request")
+    def test_read_timeout_error_is_simplified(
+        self,
+        mock_execute_request: mock.MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        mock_execute_request.side_effect = requests.exceptions.ReadTimeout(
+            "raw timeout details")
+
+        with pytest.raises(SystemExit) as exc_info:
+            main([
+                "-s", "https://10.0.0.0:9999",
+                "--timeout", "5",
+                "-m", "GetConfig",
+            ])
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert err == (
+            "Error: server did not respond from "
+            "https://10.0.0.0:9999/config within 5s\n")
+
+    @mock.patch("otgctl.cli.execute_request")
+    def test_ssl_error_is_simplified(
+        self,
+        mock_execute_request: mock.MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        mock_execute_request.side_effect = requests.exceptions.SSLError(
+            "certificate verify failed")
+
+        with pytest.raises(SystemExit) as exc_info:
+            main(["-s", "https://test:8443", "-m", "GetConfig"])
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert err == (
+            "Error: TLS failed for https://test:8443: "
+            "certificate verify failed\n")
+
+    @mock.patch("otgctl.cli.execute_request")
+    def test_connection_error_is_simplified(
+        self,
+        mock_execute_request: mock.MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        mock_execute_request.side_effect = requests.exceptions.ConnectionError(
+            "connection refused")
+
+        with pytest.raises(SystemExit) as exc_info:
+            main(["-s", "https://test:8443", "-m", "GetConfig"])
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert err == (
+            "Error: could not connect to https://test:8443: "
+            "connection refused\n")
+
+    @mock.patch("otgctl.cli.execute_request")
+    def test_request_exception_is_simplified(
+        self,
+        mock_execute_request: mock.MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        mock_execute_request.side_effect = requests.exceptions.RequestException(
+            "request failed internally")
+
+        with pytest.raises(SystemExit) as exc_info:
+            main(["-s", "https://test:8443", "-m", "GetConfig"])
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert err == "Error: request failed: request failed internally\n"
 
     def test_no_sources(self, capsys: pytest.CaptureFixture[str]) -> None:
         try:

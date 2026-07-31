@@ -9,12 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - `$OTG_INSECURE` environment variable for command-line `-k`
+- `--timeout` option for HTTP requests, defaulting to 30 seconds
+- Test coverage for CLI request options, request execution errors, and invalid
+  JSON response fallback
+- Pytest source-tree import setup so tests use the checkout under `src/`
 
 ### Changed
 - Use proper syntax for license in pyproject.toml
 - Downgrade dependencies to those available in EOS
 - Added --version
 - Exit with status 1 for non-2xx HTTP responses
+- Report unknown methods before checking whether an input source is required
+- Simplify CLI error output for common HTTP transport failures
 
 ## [0.9.0] - 2026-06-16
 

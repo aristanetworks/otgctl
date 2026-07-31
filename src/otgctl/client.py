@@ -36,6 +36,7 @@ def execute_request(
     insecure: bool = False,
     cert: str | tuple[str, str] | None = None,
     verbose: bool = False,
+    timeout: float = 30.0,
 ) -> tuple[int, Mapping[str, str], bytes]:
     """Make an HTTP request and return (status_code, headers, content_bytes)."""
     url = server.rstrip("/") + path
@@ -56,7 +57,7 @@ def execute_request(
         if body is not None:
             _debug_print(f"> {json.dumps(body, indent=2)}")
 
-    resp = requests.request(http_method, url, **kwargs)
+    resp = requests.request(http_method, url, timeout=timeout, **kwargs)
 
     if verbose:
         _debug_print(f"< HTTP {resp.status_code}")

@@ -111,6 +111,10 @@ class TestApiPath:
         with pytest.raises(ValueError, match="Invalid API path"):
             parse_api_path("/")
 
+    def test_malformed_leaf_without_key_value_raises(self) -> None:
+        with pytest.raises(ValueError, match="key=value"):
+            parse_api_path("/traffic/flow_transmit/state=start;badleaf")
+
 
 class TestType1Yaml:
     def test_single_doc(self) -> None:
@@ -230,6 +234,24 @@ class TestAnsibleTags:
         assert entries[0][0] == "set_config"
         body = entries[0][1]
         assert body["ports"][0]["name"] == "Port 0"
+
+    def test_unknown_scalar_tag(self) -> None:
+        yaml_text = "value: !CustomScalar tagged-value\n"
+        with mock.patch("sys.stdin", io.StringIO(yaml_text)):
+            entries = load_inputs(["-"], method_override="SetConfig")
+        assert entries == [("SetConfig", {"value": "tagged-value"})]
+
+    def test_unknown_sequence_tag(self) -> None:
+        yaml_text = "values: !CustomSequence\n- one\n- two\n"
+        with mock.patch("sys.stdin", io.StringIO(yaml_text)):
+            entries = load_inputs(["-"], method_override="SetConfig")
+        assert entries == [("SetConfig", {"values": ["one", "two"]})]
+
+    def test_unknown_mapping_tag(self) -> None:
+        yaml_text = "value: !CustomMapping\n  key: tagged-value\n"
+        with mock.patch("sys.stdin", io.StringIO(yaml_text)):
+            entries = load_inputs(["-"], method_override="SetConfig")
+        assert entries == [("SetConfig", {"value": {"key": "tagged-value"}})]
 
 
 class TestMultipleSources:

@@ -19,6 +19,8 @@ import importlib.metadata
 import os
 import sys
 
+import requests
+
 from otgctl.client import execute_request, format_response, print_response
 from otgctl.input import load_inputs
 from otgctl.methods import METHOD_MAP, resolve_method
@@ -69,6 +71,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Client private key file for mTLS",
     )
     parser.add_argument(
+        "--timeout",
+        type=float,
+        default=30.0,
+        help="HTTP request timeout in seconds (default: 30)",
+    )
+    parser.add_argument(
         "--list-methods",
         action="store_true",
         help="List available gRPC method names for -m and exit",
@@ -87,6 +95,10 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _request_url(server: str, path: str) -> str:
+    return server.rstrip("/") + path
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -100,8 +112,9 @@ def main(argv: list[str] | None = None) -> None:
         if args.method:
             try:
                 http_method, _ = resolve_method(args.method)
-            except ValueError:
-                http_method = None
+            except ValueError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
             if http_method == "GET":
                 args.sources = []
             else:
@@ -133,7 +146,30 @@ def main(argv: list[str] | None = None) -> None:
             status, headers, content = execute_request(
                 args.server, http_method, path, body,
                 insecure=args.insecure, cert=cert,
-                verbose=args.verbose)
+                verbose=args.verbose, timeout=args.timeout)
+        except requests.exceptions.ConnectTimeout:
+            print(
+                f"Error: connection to {_request_url(args.server, path)} "
+                f"timed out after {args.timeout:g}s",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        except requests.exceptions.ReadTimeout:
+            print(
+                f"Error: server did not respond from "
+                f"{_request_url(args.server, path)} within {args.timeout:g}s",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        except requests.exceptions.SSLError as e:
+            print(f"Error: TLS failed for {args.server}: {e}", file=sys.stderr)
+            sys.exit(1)
+        except requests.exceptions.ConnectionError as e:
+            print(f"Error: could not connect to {args.server}: {e}", file=sys.stderr)
+            sys.exit(1)
+        except requests.exceptions.RequestException as e:
+            print(f"Error: request failed: {e}", file=sys.stderr)
+            sys.exit(1)
         except Exception as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
