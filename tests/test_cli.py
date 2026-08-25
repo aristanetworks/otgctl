@@ -161,6 +161,27 @@ class TestCliType2:
         assert call_args[0] == ("POST", "https://test:8443/config")
         assert call_args[1]["json"] == TYPE2_BODY
 
+    @mock.patch("otgctl.client.requests.request")
+    def test_textproto_with_method(
+        self, mock_request: mock.MagicMock, tmp_path,
+    ) -> None:
+        pytest.importorskip("snappi")
+        mock_request.return_value = make_mock_response(body={"warning": {}})
+        path = tmp_path / "config.textproto"
+        path.write_text('''
+{
+  config { ports { name: "p1" location: "Ethernet1" } }
+}
+''')
+
+        main(["-s", "https://test:8443", "-m", "SetConfig", str(path)])
+
+        call_args = mock_request.call_args
+        assert call_args[0] == ("POST", "https://test:8443/config")
+        assert call_args[1]["json"] == {
+            "ports": [{"name": "p1", "location": "Ethernet1"}],
+        }
+
 
 class TestCliApiPath:
     @mock.patch("otgctl.client.requests.request")

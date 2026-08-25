@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import io
 import os
+import sys
 from unittest import mock
 
 import pytest
@@ -182,6 +183,54 @@ class TestJsonFile:
         path = os.path.join(FIXTURES, "type2.json")
         with pytest.raises(ValueError, match="method"):
             load_inputs([path], method_override=None)
+
+
+class TestTextprotoFile:
+    def test_set_config_textproto_unwraps_request(self, tmp_path) -> None:
+        pytest.importorskip("snappi")
+        path = tmp_path / "config.textproto"
+        path.write_text('''{
+  config {
+    ports { name: "p1" location: "Ethernet1" }
+  }
+}
+''')
+
+        entries = load_inputs([str(path)], method_override="SetConfig")
+
+        assert entries == [("SetConfig", {
+            "ports": [{"name": "p1", "location": "Ethernet1"}],
+        })]
+
+    def test_unknown_fields_retry_with_warning(self, tmp_path, capsys) -> None:
+        pytest.importorskip("snappi")
+        path = tmp_path / "config.textproto"
+        path.write_text('''
+unknown_request_field: "ignored"
+config { ports { name: "p1" } }
+''')
+
+        entries = load_inputs([str(path)], method_override="SetConfig")
+
+        assert entries[0][1] == {"ports": [{"name": "p1"}]}
+        warning = capsys.readouterr().err
+        assert "unknown_request_field" in warning
+        assert "retrying with unknown fields allowed" in warning
+
+    def test_requires_method(self, tmp_path) -> None:
+        path = tmp_path / "config.textproto"
+        path.write_text("config {}\n")
+
+        with pytest.raises(ValueError, match="requires -m"):
+            load_inputs([str(path)], method_override=None)
+
+    def test_missing_snappi_is_reported(self, tmp_path) -> None:
+        path = tmp_path / "config.textproto"
+        path.write_text("config {}\n")
+
+        with mock.patch.dict(sys.modules, {"snappi": None}):
+            with pytest.raises(ValueError, match="optional 'snappi'"):
+                load_inputs([str(path)], method_override="SetConfig")
 
 
 class TestApiPathInput:

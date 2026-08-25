@@ -83,7 +83,7 @@ Exit codes:
 
 ### Input formats
 
-otgctl accepts three input formats. Multiple inputs can be given on a single command line and are executed sequentially.
+otgctl accepts four input formats. Multiple inputs can be given on a single command line and are executed sequentially.
 
 #### 1. YAML with method and request
 
@@ -120,7 +120,25 @@ otgctl -s https://otg-server:8443 -m SetConfig config.json
 
 JSON files are detected by `.json` extension.
 
-#### 3. API path
+#### 3. Protobuf text format
+
+Files ending in `.textproto`, `.textpb`, or `.pbtxt` are parsed using the
+protobuf request model from the optional `snappi` package. Select the gRPC
+operation with `-m`:
+
+```
+pip install 'otgctl[snappi]'
+otgctl -s https://otg-server:8443 -m SetConfig config.textproto
+```
+
+For example, a `SetConfigRequest` textproto contains a top-level `config`
+field. otgctl removes that request wrapper before sending the REST body, so
+the REST request contains the contents of `config` rather than a nested
+`config` property. If strict parsing fails because the installed `snappi`
+schema is older than the input, otgctl retries with unknown fields allowed and
+prints a warning.
+
+#### 4. API path
 
 A compact notation for simple requests, prefixed with `//`. The slash-separated path builds a nested object with `choice` keys at each level. The leaf segment contains one or more `key=value` pairs.
 

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Parse textproto input, to make it easy to try configurations from
+  ondatra error logs.
+
 ## [0.9.1] - 2026-08-25
 
 ### Added

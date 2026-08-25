@@ -16,7 +16,8 @@ WORKDIR /test
 COPY --from=wheel /dist/*.whl /tmp/
 COPY tests ./tests
 
-RUN python -m pip install --no-cache-dir /tmp/*.whl \
-    "pytest>=6.2.2" "pytest-cov>=4.0.0"
+RUN test_wheel="$(printf '%s\n' /tmp/*.whl)" \
+    && python -m pip install --no-cache-dir \
+       "${test_wheel}[snappi,test]"
 
 CMD ["python", "-m", "pytest", "-q", "--cov=otgctl", "--cov-branch", "--cov-report=term-missing"]

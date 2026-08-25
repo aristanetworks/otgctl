@@ -29,6 +29,9 @@ classifiers = [
 otgctl = "otgctl.cli:main"
 
 [project.optional-dependencies]
+snappi = [
+    "snappi",
+]
 test = [
     "pytest>=6.2.2",
     "pytest-cov>=4.0.0",

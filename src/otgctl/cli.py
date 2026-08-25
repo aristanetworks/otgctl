@@ -35,7 +35,10 @@ def build_parser() -> argparse.ArgumentParser:
         version = "dev"
     parser = argparse.ArgumentParser(
         prog="otgctl",
-        description=f"otgctl {version} — Make OTG REST API calls from YAML/JSON input.",
+        description=(
+            f"otgctl {version} — Make OTG REST API calls from YAML, JSON, "
+            "or protobuf text-format input."
+        ),
     )
     parser.add_argument(
         "--version",
@@ -92,7 +95,7 @@ def build_parser() -> argparse.ArgumentParser:
         "sources",
         nargs="*",
         metavar="FILE_OR_STRING",
-        help='YAML/JSON file, "-" for stdin, or //api/path=value',
+        help='YAML/JSON/textproto file, "-" for stdin, or //api/path=value',
     )
     return parser
 
