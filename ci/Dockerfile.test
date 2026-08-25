@@ -1,0 +1,22 @@
+# Build and test the installed wheel in a clean Python environment.
+ARG PYTHON_VERSION=3.9
+
+FROM python:${PYTHON_VERSION}-slim AS wheel
+
+WORKDIR /build
+COPY pyproject.toml README.md LICENSE ./
+COPY src ./src
+
+RUN python -m pip install --no-cache-dir "setuptools>=61,<77" wheel build \
+    && python -m build --wheel --no-isolation --outdir /dist
+
+FROM python:${PYTHON_VERSION}-slim AS test
+
+WORKDIR /test
+COPY --from=wheel /dist/*.whl /tmp/
+COPY tests ./tests
+
+RUN python -m pip install --no-cache-dir /tmp/*.whl \
+    "pytest>=6.2.2" "pytest-cov>=4.0.0"
+
+CMD ["python", "-m", "pytest", "-q", "--cov=otgctl", "--cov-branch", "--cov-report=term-missing"]
