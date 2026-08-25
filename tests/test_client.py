@@ -79,6 +79,13 @@ class TestFormatResponse:
         assert text == "{not valid json"
         assert binary is None
 
+    def test_problem_json_is_formatted_as_json(self) -> None:
+        headers = {"Content-Type": "application/problem+json; charset=utf-8"}
+        text, binary = format_response(
+            400, headers, b'{"detail": "bad request"}', "yaml")
+        assert text == "HTTP 400\ndetail: bad request"
+        assert binary is None
+
 
 class TestPrintResponse:
     def test_text_output(self, capsys: pytest.CaptureFixture[str]) -> None:

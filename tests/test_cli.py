@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import io
 import os
 from unittest import mock
 
@@ -105,6 +106,13 @@ class TestBuildParserTimeout:
         parser = build_parser()
         args = parser.parse_args(["--timeout", "5", "-m", "GetVersion"])
         assert args.timeout == 5.0
+
+    @pytest.mark.parametrize("value", ["0", "-1", "nan", "inf", "-inf"])
+    def test_timeout_must_be_positive_finite(self, value: str) -> None:
+        parser = build_parser()
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args(["--timeout", value, "-m", "GetVersion"])
+        assert exc_info.value.code == 2
 
 
 class TestCliType1:
@@ -250,6 +258,12 @@ class TestCliRequestOptions:
 
         assert mock_request.call_args[1]["cert"] == "client.pem"
 
+    def test_key_requires_cert(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            main(["--key", "client.key", "-m", "GetVersion"])
+        assert exc_info.value.code == 2
+        assert "--key requires --cert" in capsys.readouterr().err
+
 
 class TestCliListMethods:
     def test_list_methods(self, capsys: pytest.CaptureFixture[str]) -> None:
@@ -293,6 +307,30 @@ class TestCliNoSources:
 
 
 class TestCliErrors:
+    def test_malformed_yaml_is_reported_without_traceback(
+        self, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        with mock.patch("sys.stdin", io.StringIO("method: SetConfig\nrequest: [\n")):
+            with pytest.raises(SystemExit) as exc_info:
+                main(["-m", "SetConfig", "-"])
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert err.startswith("Error:")
+        assert "Traceback" not in err
+
+    def test_invalid_embedded_method_is_reported_without_traceback(
+        self, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        with mock.patch("sys.stdin", io.StringIO("method: null\nrequest: {}\n")):
+            with pytest.raises(SystemExit) as exc_info:
+                main(["-"])
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "method" in err
+        assert "Traceback" not in err
+
     @mock.patch("otgctl.client.requests.request")
     def test_http_error_exits_nonzero(
         self, mock_request: mock.MagicMock, capsys: pytest.CaptureFixture[str],

@@ -16,10 +16,12 @@ from __future__ import annotations
 
 import argparse
 import importlib.metadata
+import math
 import os
 import sys
 
 import requests
+import yaml
 
 from otgctl.client import execute_request, format_response, print_response
 from otgctl.input import load_inputs
@@ -72,7 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--timeout",
-        type=float,
+        type=_positive_timeout,
         default=30.0,
         help="HTTP request timeout in seconds (default: 30)",
     )
@@ -95,6 +97,18 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _positive_timeout(value: str) -> float:
+    """Parse a timeout that requests can use reliably."""
+    try:
+        timeout = float(value)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError("timeout must be a number") from e
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise argparse.ArgumentTypeError(
+            "timeout must be a positive finite number")
+    return timeout
+
+
 def _request_url(server: str, path: str) -> str:
     return server.rstrip("/") + path
 
@@ -102,6 +116,9 @@ def _request_url(server: str, path: str) -> str:
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.key and not args.cert:
+        parser.error("--key requires --cert")
 
     if args.list_methods:
         for name, (http_method, path) in METHOD_MAP.items():
@@ -128,7 +145,7 @@ def main(argv: list[str] | None = None) -> None:
 
     try:
         entries = load_inputs(args.sources, args.method)
-    except (ValueError, FileNotFoundError, OSError) as e:
+    except (ValueError, FileNotFoundError, OSError, yaml.YAMLError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 

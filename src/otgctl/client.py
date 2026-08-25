@@ -87,9 +87,13 @@ def format_response(
     to write them based on whether stdout is a tty).
     """
     content_type = headers.get("Content-Type", "")
+    media_type = content_type.split(";", 1)[0].strip().lower()
 
-    is_json = "application/json" in content_type or "text/json" in content_type
-    is_text = is_json or "text/" in content_type
+    is_json = (
+        media_type in ("application/json", "text/json")
+        or media_type.endswith("+json")
+    )
+    is_text = is_json or media_type.startswith("text/")
     is_ok = 200 <= status_code < 300
 
     if not is_text and content:

@@ -8,6 +8,36 @@ A command-line tool for making [Open Traffic Generator (OTG)](https://otg.dev) R
 pip install .
 ```
 
+Building from source uses the PEP 517/PEP 621 configuration in
+`pyproject.toml` and requires setuptools 61 or newer plus `wheel`. Installing
+a prebuilt wheel does not require setuptools. In a constrained build
+environment where those tools are already installed, use:
+
+```
+python3 -m pip install --no-build-isolation .
+```
+
+## Development
+
+Run the tests against the source tree with:
+
+```
+python3 -m pytest
+```
+
+To build a wheel and run the tests against that installed wheel in a clean
+environment:
+
+```
+sh ci/test.sh
+```
+
+The wrapper uses `ci/Dockerfile.test` and accepts `PYTHON_VERSION` and `OTGCTL_TEST_IMAGE` environment
+variables, for example `PYTHON_VERSION=3.13 sh ci/test.sh`.
+
+See [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md) for the release
+checklist and artifact-publishing process.
+
 ## Usage
 
 ```
@@ -148,7 +178,8 @@ The `//` API-path syntax is intended for simple string-valued requests. It does
 not perform YAML/JSON type conversion: values are sent as strings, except that
 comma-separated values and keys ending in `s` become lists of strings. Use YAML
 or JSON input when you need booleans, numbers, nested arrays, escaping commas,
-or more complex request bodies.
+or more complex request bodies. Empty path segments and keys are rejected, as
+are duplicate keys in a leaf.
 
 #### Stdin
 

@@ -19,6 +19,7 @@ import os
 from unittest import mock
 
 import pytest
+import yaml
 
 from otgctl.input import load_inputs, parse_api_path
 from tests.constants import FIXTURES, TYPE1_SINGLE_BODY, TYPE2_BODY
@@ -115,6 +116,18 @@ class TestApiPath:
         with pytest.raises(ValueError, match="key=value"):
             parse_api_path("/traffic/flow_transmit/state=start;badleaf")
 
+    def test_empty_key_raises(self) -> None:
+        with pytest.raises(ValueError, match="empty key"):
+            parse_api_path("/traffic/=value")
+
+    def test_empty_segment_raises(self) -> None:
+        with pytest.raises(ValueError, match="empty segment"):
+            parse_api_path("/traffic//state=start")
+
+    def test_duplicate_key_raises(self) -> None:
+        with pytest.raises(ValueError, match="duplicate key"):
+            parse_api_path("/traffic/state=start;state=stop")
+
 
 class TestType1Yaml:
     def test_single_doc(self) -> None:
@@ -132,6 +145,13 @@ class TestType1Yaml:
         assert entries[0][0] == "SetConfig"
         assert entries[1][0] == "SetControlState"
         assert entries[2][0] == "SetControlState"
+
+    @pytest.mark.parametrize("method", [None, [], {}])
+    def test_invalid_embedded_method_raises(self, method: object) -> None:
+        yaml_text = yaml.safe_dump({"method": method, "request": {}})
+        with mock.patch("sys.stdin", io.StringIO(yaml_text)):
+            with pytest.raises(ValueError, match="non-empty string"):
+                load_inputs(["-"], method_override=None)
 
 
 class TestType2Yaml:

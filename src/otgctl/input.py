@@ -69,6 +69,12 @@ def _parse_leaf(segment: str) -> dict[str, str | list[str]]:
             raise ValueError(
                 f"API path leaf must contain key=value pairs: {segment}")
         key, _, raw = pair.partition("=")
+        if not key:
+            raise ValueError(
+                f"API path leaf contains an empty key: {segment}")
+        if key in result:
+            raise ValueError(
+                f"API path leaf contains duplicate key '{key}': {segment}")
         result[key] = _parse_value(key, raw)
     return result
 
@@ -90,6 +96,8 @@ def parse_api_path(s: str) -> dict[str, Any]:
 
     if not parts or not parts[-1]:
         raise ValueError(f"Invalid API path: /{s}")
+    if any(not part for part in parts):
+        raise ValueError(f"Invalid API path with empty segment: /{s}")
 
     if "=" in parts[-1]:
         result = _parse_leaf(parts[-1])
@@ -134,6 +142,9 @@ def _classify_doc(doc: Any, method_override: str | None) -> tuple[str, Any] | No
     """
     if isinstance(doc, dict) and "method" in doc:
         method = doc["method"]
+        if not isinstance(method, str) or not method.strip():
+            raise ValueError(
+                "Input 'method' must be a non-empty string.")
         if method in SKIP_METHODS:
             return None
         body = doc.get("request")

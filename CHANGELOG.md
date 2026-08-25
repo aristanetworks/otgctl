@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Test coverage for CLI request options, request execution errors, and invalid
   JSON response fallback
 - Pytest source-tree import setup so tests use the checkout under `src/`
+- Clean Docker wheel-build test for validating the installed package
 
 ### Changed
 - Use proper syntax for license in pyproject.toml
@@ -21,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Exit with status 1 for non-2xx HTTP responses
 - Report unknown methods before checking whether an input source is required
 - Simplify CLI error output for common HTTP transport failures
+- Report malformed YAML and embedded methods as CLI errors instead of tracebacks
+- Validate API-path keys and segments, and recognize structured JSON responses
+- Use PEP 621 project metadata with a setuptools 61+ build requirement,
+  compatible with the setuptools 69 toolchain available in EOS
 
 ## [0.9.0] - 2026-06-16
 
