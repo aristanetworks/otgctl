@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.9.2rc2] - 2026-08-31
+## [0.9.2rc3] - 2026-08-31
 
 ### Added
 - Parse textproto input, to make it easy to try configurations from
