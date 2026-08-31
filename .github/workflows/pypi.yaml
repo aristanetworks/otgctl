@@ -29,8 +29,6 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
-      attestations: write
-      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -63,12 +61,6 @@ jobs:
           name: python-package-distributions
           path: ${{ runner.temp }}/otgctl-dist/
           if-no-files-found: error
-      - name: Create provenance attestation
-        env:
-          GH_TOKEN: ${{ github.token }}
-          DIST_DIR: ${{ runner.temp }}/otgctl-dist
-        run: gh attestation attest --repo "$GITHUB_REPOSITORY" "$DIST_DIR"/*
-
   publish-testpypi:
     needs: build
     if: github.event.release.prerelease
