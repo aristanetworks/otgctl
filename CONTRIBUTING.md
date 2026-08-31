@@ -35,10 +35,12 @@ Run the clean installed-wheel test with:
 sh ci/test.sh
 ```
 
-The Docker test accepts a Python version override:
+GitHub CI runs this check on Python 3.9, 3.12, and 3.14. To reproduce the
+same check inside Docker locally, use the optional wrapper. It accepts a
+Python version override:
 
 ```bash
-PYTHON_VERSION=3.13 sh ci/test.sh
+PYTHON_VERSION=3.14 sh ci/docker-test.sh
 ```
 
 Tests do not require a live OTG server. HTTP requests should be mocked in unit
@@ -52,7 +54,8 @@ tests so the suite remains deterministic and safe to run in CI.
 - Add a note under `Unreleased` in `CHANGELOG.md` for meaningful user-facing
   changes.
 - Run `python -m pytest`, `sh ci/test.sh`, and `git diff --check` before
-  submitting a change.
+  submitting a change. Use `sh ci/docker-test.sh` when Docker is the most
+  convenient way to get a clean environment.
 - Never commit credentials, certificates, private keys, generated build
   artifacts, or environment-specific configuration.
 
@@ -63,8 +66,7 @@ description.
 
 ## Submitting changes for review
 
-Submit changes through the review system configured for the repository.
-(Expected to be a pull request on GitHub when we get there.)
+Submit changes through a GitHub pull request targeting `main`.
 
 Keep review changes focused. The description should explain the problem, the
 behavioral change, and the tests that were run. Include examples for changes

@@ -1,0 +1,102 @@
+name: Publish package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.12', '3.14']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: OTGCTL_PYTHON_BIN=python sh ci/test.sh
+
+  build:
+    needs: validate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Verify release type and package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          version=$(python -c 'import re; from pathlib import Path; print(re.search(r"^version\\s*=\\s*\\\"([^\\\"]+)\\\"", Path("pyproject.toml").read_text(), re.MULTILINE).group(1))')
+          tag_version=${RELEASE_TAG#v}
+          test "$tag_version" = "$version"
+          case "$version" in *a[0-9]*|*b[0-9]*|*rc[0-9]*|*.dev[0-9]*) package_is_prerelease=true ;; *) package_is_prerelease=false ;; esac
+          test "$RELEASE_PRERELEASE" = "$package_is_prerelease"
+      - run: python -m pip install --disable-pip-version-check '.[release]'
+      - run: OTGCTL_PYTHON_BIN=python OTGCTL_DIST_DIR="$RUNNER_TEMP/otgctl-dist" sh ci/build-release.sh "${{ github.event.release.tag_name }}"
+      - name: Create checksum manifest and attach release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          DIST_DIR: ${{ runner.temp }}/otgctl-dist
+        run: |
+          sha256sum "$DIST_DIR"/* > "$RUNNER_TEMP/SHA256SUMS"
+          gh release upload "$RELEASE_TAG" "$DIST_DIR"/* "$RUNNER_TEMP/SHA256SUMS"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: python-package-distributions
+          path: ${{ runner.temp }}/otgctl-dist/
+          if-no-files-found: error
+      - name: Create provenance attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIST_DIR: ${{ runner.temp }}/otgctl-dist
+        run: gh attestation attest --repo "$GITHUB_REPOSITORY" "$DIST_DIR"/*
+
+  publish-testpypi:
+    needs: build
+    if: github.event.release.prerelease
+    runs-on: ubuntu-24.04
+    environment: testpypi
+    permissions:
+      actions: read
+      id-token: write
+    steps:
+      - name: Download package distributions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --name python-package-distributions --dir dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    needs: build
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-24.04
+    environment: pypi
+    permissions:
+      actions: read
+      id-token: write
+    steps:
+      - name: Download package distributions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --name python-package-distributions --dir dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
