@@ -54,7 +54,10 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           DIST_DIR: ${{ runner.temp }}/otgctl-dist
         run: |
-          sha256sum "$DIST_DIR"/* > "$RUNNER_TEMP/SHA256SUMS"
+          (
+            cd "$DIST_DIR"
+            sha256sum ./*
+          ) > "$RUNNER_TEMP/SHA256SUMS"
           gh release upload "$RELEASE_TAG" "$DIST_DIR"/* "$RUNNER_TEMP/SHA256SUMS"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
