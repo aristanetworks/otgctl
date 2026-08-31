@@ -1,128 +1,59 @@
 # Releasing otgctl
 
-Releases are made from a protected version tag. The tag, the version in
-`pyproject.toml`, and the release section in `CHANGELOG.md` must agree.
+Releases are created from GitHub Releases, never directly from a developer workstation. The release tag, the version in `pyproject.toml`, and the release section in `CHANGELOG.md` must agree. Tags and published package versions are immutable: if anything goes wrong after a publication attempt, fix the issue, increment the version, and make a new tag and release.
 
-The repository scripts build and validate artifacts but do not publish them.
-Publishing should happen from a protected CI job or from an explicitly
-authenticated release-manager workstation.
+## One-time GitHub configuration
 
-## Prerequisites
+Before the first release, a repository administrator must:
 
-Install the release tools in a virtual environment or build environment:
+- Make `main` the default branch and protect it with pull requests, the CI workflow checks, and no force pushes.
+- In **Settings → Rules → Rulesets**, create a tag rule for `v*`. Permit only the release-manager team to create matching tags; block updates and deletion.
+- In **Settings → Actions → General**, set the default `GITHUB_TOKEN` permission to read-only. The workflows request their small additional permissions explicitly.
+- Create protected deployment environments named `pypi` and `testpypi`. Require release-manager approval for `pypi`; approval for `testpypi` is optional.
+- Register PyPI trusted publishers for repository `aristanetworks/otgctl`, workflow file `pypi.yaml`, and environment `pypi`. Register a separate TestPyPI trusted publisher with the same repository and workflow file, using environment `testpypi`.
 
-```bash
-python3 -m pip install ".[release]"
-```
-
-The project build requires setuptools 61 or newer and `wheel`.
-
-## Protect release tags
-
-Tag protection is a server-side
-repository policy that prevents unapproved users or jobs from creating,
-rewriting, or deleting release tags.
-
-Configure a protected-tag rule for `v*` before the first release:
-
-- **GitLab:** Settings → Repository → Protected tags. Set the pattern to
-  `v*` and allow only Maintainers or a dedicated Release Managers group to
-  create tags. Do not allow force-push or deletion.
-- **GitHub:** Repository Settings → Rules → Rulesets. Add a tag rule for
-  `v*`, restrict tag creation to the release-manager team, and prevent updates
-  and deletion.
-- **Gerrit:** Grant `Create Reference` for `refs/tags/v*` only to the release
-  manager or release automation group, and deny force-update and deletion.
-
-After the release commit is merged, an authorized release manager creates and
-pushes an annotated tag:
-
-```bash
-git tag -a v1.0.0 -m "otgctl 1.0.0"
-git push origin v1.0.0
-```
-
-The protected-tag CI job should build and publish only when the tag matches
-the project version. Release tags should never be moved; if a release needs
-correction, publish a new patch version.
+No PyPI token, personal access token, or other long-lived publishing credential is stored in GitHub. PyPI and TestPyPI publishing uses the short-lived OIDC identity issued to the deployment job.
 
 ## Prepare a release
 
 1. Update the version in `pyproject.toml`.
-2. Move the relevant entries from `Unreleased` in `CHANGELOG.md` into a
-   dated release section.
-3. Commit and merge the release-preparation change.
-4. From a checkout of that release commit, run the local tests:
+2. Move the relevant entries from `Unreleased` in `CHANGELOG.md` into a dated release section.
+3. Commit and merge the release-preparation pull request into `main`.
+4. From that merged commit, run the local checks:
 
    ```bash
    python3 -m pytest
-   ```
-
-5. Run the clean installed-wheel test:
-
-   ```bash
    sh ci/test.sh
-   ```
-
-6. Optionally build and validate the release artifacts locally:
-
-   ```bash
    OTGCTL_RELEASE_TAG=v1.0.0 sh ci/build-release.sh
    ```
 
-   The script builds the current checkout; it does not check out the tag.
-   It verifies that the requested tag matches the project version and runs
-   `twine check`.
-
-7. Create the matching protected tag, for example `v1.0.0`:
+   The last command verifies the tag/version match and runs `twine check`; it does not publish anything.
+5. An authorized release manager creates an annotated, protected tag:
 
    ```bash
    git tag -a v1.0.0 -m "otgctl 1.0.0"
-   git push origin v1.0.0
+   git push github v1.0.0
    ```
 
-The tag should be created only after the release commit is merged. The
-tag-triggered CI pipeline checks out that tag, repeats the tests and build, and
-publishes the CI-produced artifacts rather than trusting a developer's local
-build.
+   Never move or recreate that tag. If a tag is wrong, create a higher version instead.
 
-## Publishing to PyPI
+## Rehearse with TestPyPI
 
-Configure a PyPI account or a CI trusted publisher before the first release.
-For a rehearsal, use TestPyPI first:
+Use a new PEP 440 prerelease, for example `0.9.2rc1`, before the first stable production release. After the tag is pushed, create a GitHub Release from the tag and select **Set as a pre-release**, then publish it. The `pypi.yaml` workflow verifies that the prerelease checkbox agrees with the package version, tests the tagged code on Python 3.9, 3.12, and 3.14, and publishes only through the `testpypi` environment.
+
+Download the GitHub Release assets and verify them:
 
 ```bash
-python3 -m twine upload --repository testpypi dist/*
+sha256sum -c SHA256SUMS
+python3 -m venv .venv-testpypi
+. .venv-testpypi/bin/activate
+python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple otgctl==0.9.2rc1
+otgctl --version
+otgctl --help
 ```
 
-The production upload is:
+## Publish a stable release
 
-```bash
-python3 -m twine upload dist/*
-```
+For a stable version, create and publish a normal GitHub Release (do not select pre-release). The same workflow validates and builds the release once, attaches the wheel, source distribution, and `SHA256SUMS` to the GitHub Release, creates a provenance attestation, and then waits for approval in the protected `pypi` environment. After approval, its separate deployment job publishes the already built artifacts to PyPI via OIDC.
 
-Do not commit credentials or put tokens in command history. Prefer CI trusted
-publishing or an environment-provided token. PyPI does not allow replacing a
-published version, so verify the version and artifacts before uploading.
-
-## Publishing to an internal PyPI-compatible registry
-
-The same artifacts can be uploaded to GitLab, Artifactory, Nexus, or another
-internal registry with a repository URL:
-
-```bash
-python3 -m twine upload \
-  --repository-url https://gitlab.example.com/api/v4/projects/PROJECT_ID/packages/pypi \
-  dist/*
-```
-
-The exact URL and credential mechanism depend on the registry. In CI, use the
-registry's job token or secret rather than a personal token where possible.
-
-## Hosting migration
-
-Source hosting and package hosting are independent. During a GitLab-to-GitHub
-or Gerrit migration, keep one authoritative publishing job and disable the
-others. GitLab CI, GitHub Actions, and Gerrit/Jenkins or Zuul jobs should all
-invoke the shared scripts in `ci/`; only their event and credential wiring
-should differ.
+Verify the PyPI project page, GitHub Release assets and checksums, and a clean install from production PyPI. GitHub's automatic source archives are distinct from the packaged Python source distribution attached by the workflow.
