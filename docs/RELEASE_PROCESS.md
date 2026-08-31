@@ -54,6 +54,11 @@ otgctl --help
 
 ## Publish a stable release
 
-For a stable version, create and publish a normal GitHub Release (do not select pre-release). The same workflow validates and builds the release once, attaches the wheel, source distribution, and `SHA256SUMS` to the GitHub Release, creates a provenance attestation, and then waits for approval in the protected `pypi` environment. After approval, its separate deployment job publishes the already built artifacts to PyPI via OIDC.
+For a stable version, create and publish a normal GitHub Release (do not select pre-release). The same workflow validates and builds the release once, attaches the wheel, source distribution, and `SHA256SUMS` to the GitHub Release, and then waits for approval in the protected `pypi` environment. After approval, its separate deployment job publishes the already built artifacts to PyPI via OIDC.
 
 Verify the PyPI project page, GitHub Release assets and checksums, and a clean install from production PyPI. GitHub's automatic source archives are distinct from the packaged Python source distribution attached by the workflow.
+
+GitHub provenance attestations are temporarily omitted because the enterprise
+Actions policy does not allow the official attestation action. Restore that
+step only after the policy allows its pinned revision, and document the
+resulting provenance verification procedure at the same time.
