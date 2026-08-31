@@ -43,7 +43,7 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
-          version=$(python -c 'import re; from pathlib import Path; print(re.search(r"^version\\s*=\\s*\\\"([^\\\"]+)\\\"", Path("pyproject.toml").read_text(), re.MULTILINE).group(1))')
+          version=$(python -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')
           tag_version=${RELEASE_TAG#v}
           test "$tag_version" = "$version"
           case "$version" in *a[0-9]*|*b[0-9]*|*rc[0-9]*|*.dev[0-9]*) package_is_prerelease=true ;; *) package_is_prerelease=false ;; esac
