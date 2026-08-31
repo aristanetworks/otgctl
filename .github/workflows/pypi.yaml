@@ -73,7 +73,7 @@ jobs:
       - name: Download package distributions
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download "$GITHUB_RUN_ID" --name python-package-distributions --dir dist
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name python-package-distributions --dir dist
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
@@ -90,5 +90,5 @@ jobs:
       - name: Download package distributions
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download "$GITHUB_RUN_ID" --name python-package-distributions --dir dist
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name python-package-distributions --dir dist
       - uses: pypa/gh-action-pypi-publish@release/v1
