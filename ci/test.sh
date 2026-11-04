@@ -27,5 +27,13 @@ if [ -z "$wheel" ]; then
 fi
 
 "$venv_python" -m pip install --disable-pip-version-check --no-cache-dir \
-    "${wheel}[snappi,test]"
+    "${wheel}[test]"
+expected_version=$("$venv_python" -c 'from importlib.metadata import version; print("otgctl " + version("otgctl"))')
+test "$("$venv_dir/bin/otgctl" --version)" = "$expected_version"
+"$venv_dir/bin/otgctl" --help > /dev/null
+export OTGCTL_TEST_INSTALLED=1
+"$venv_python" -m pytest -q
+
+"$venv_python" -m pip install --disable-pip-version-check --no-cache-dir \
+    "${wheel}[snappi]"
 "$venv_python" -m pytest -q --cov=otgctl --cov-branch --cov-report=term-missing

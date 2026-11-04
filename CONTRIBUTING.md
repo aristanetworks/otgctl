@@ -35,6 +35,12 @@ Run the clean installed-wheel test with:
 sh ci/test.sh
 ```
 
+This builds and installs a wheel in a fresh virtual environment, checks its CLI
+entry point, and runs the tests without snappi and then with it installed.
+The script sets `OTGCTL_TEST_INSTALLED=1` so tests verify the installed package's
+location and do not add the checkout's `src` directory to the import path.
+Ordinary `python -m pytest` runs continue to test the source tree.
+
 GitHub CI runs this check on Python 3.9, 3.12, and 3.14. To reproduce the
 same check inside Docker locally, use the optional wrapper. It accepts a
 Python version override:
@@ -87,6 +93,10 @@ issues rather than opening a public issue.
 Contributors do not need to publish packages. The release checklist,
 tag protection guidance, and package-publishing instructions are in
 [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
+
+During development, use the next planned version with a `.dev0` suffix and keep
+changelog entries under `Unreleased`. Developers may increment the development
+suffix when useful; no per-commit bump is required.
 
 ## License
 

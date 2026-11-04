@@ -14,9 +14,21 @@ Before the first release, a repository administrator must:
 
 No PyPI token, personal access token, or other long-lived publishing credential is stored in GitHub. PyPI and TestPyPI publishing uses the short-lived OIDC identity issued to the deployment job.
 
+## Development versions
+
+The first commit to `main` after a release updates `pyproject.toml` to the next
+planned version with a `.dev0` suffix. For example, after releasing `0.9.2`,
+use `0.9.3.dev0`. Keep changelog entries under `Unreleased` during development.
+
+All unreleased commits can share `.dev0`; there is no per-commit version bump.
+Developers can use `.dev1`, `.dev2`, and so on when useful, at their discretion.
+Development version bumps do not need Git tags.
+
 ## Prepare a release
 
-1. Update the version in `pyproject.toml`.
+1. Replace the development version in `pyproject.toml` with the intended release
+   version, for example `0.9.3.dev0` becomes `0.9.3` (or `0.9.3rc1` for a release
+   candidate).
 2. Move the relevant entries from `Unreleased` in `CHANGELOG.md` into a dated release section.
 3. Commit and merge the release-preparation pull request into `main`.
 4. From that merged commit, run the local checks:
@@ -39,7 +51,7 @@ No PyPI token, personal access token, or other long-lived publishing credential 
 
 ## Rehearse with TestPyPI
 
-Use a new PEP 440 prerelease, for example `0.9.2rc1`, before the first stable production release. After the tag is pushed, create a GitHub Release from the tag and select **Set as a pre-release**, then publish it. The `pypi.yaml` workflow verifies that the prerelease checkbox agrees with the package version, tests the tagged code on Python 3.9, 3.12, and 3.14, and publishes only through the `testpypi` environment.
+Use a new PEP 440 prerelease, for example `0.9.3rc1`, before the first stable production release. After the tag is pushed, create a GitHub Release from the tag and select **Set as a pre-release**, then publish it. The `pypi.yaml` workflow verifies that the prerelease checkbox agrees with the package version, tests the tagged code on Python 3.9, 3.12, and 3.14, and publishes only through the `testpypi` environment.
 
 Download the GitHub Release assets and verify them:
 
@@ -47,7 +59,7 @@ Download the GitHub Release assets and verify them:
 sha256sum -c SHA256SUMS
 python3 -m venv .venv-testpypi
 . .venv-testpypi/bin/activate
-python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple otgctl==0.9.2rc1
+python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple otgctl==0.9.3rc1
 otgctl --version
 otgctl --help
 ```

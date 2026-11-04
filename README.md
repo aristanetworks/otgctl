@@ -1,12 +1,20 @@
 # otgctl
 
-A command-line tool for making [Open Traffic Generator (OTG)](https://otg.dev) REST API calls from YAML or JSON input.
+A command-line tool for making [Open Traffic Generator (OTG)](https://otg.dev) REST or gRPC API calls from YAML, JSON, or protobuf text-format input.
 
 ## Installation
 
 ```
 pip install .
 ```
+
+For gRPC transport or protobuf text-format input, install the optional snappi dependency:
+
+```
+pip install '.[snappi]'
+```
+
+HTTP requests with YAML or JSON input do not require snappi, grpcio, or protobuf.
 
 Building from source uses the PEP 517/PEP 621 configuration in
 `pyproject.toml` and requires setuptools 61 or newer plus `wheel`. Installing
@@ -26,7 +34,7 @@ python3 -m pytest
 ```
 
 To build a wheel and run the tests against that installed wheel in a clean
-environment:
+environment, first without snappi and then with it installed:
 
 ```
 sh ci/test.sh
@@ -48,14 +56,14 @@ otgctl [-s SERVER] [-m METHOD] [-o json] [-k] [-v] [--cert FILE] [--key FILE] [-
 
 | Flag | Description |
 |------|-------------|
-| `-s`, `--server` | OTG server URL (default: `$OTG_API` or `https://localhost:8443`) |
+| `-s`, `--server` | OTG server URL: `http://`, `https://`, or `grpc://host:port` (default: `$OTG_API` or `https://localhost:8443`) |
 | `-m`, `--method` | OTG method name or REST path (see [Methods](#methods)) |
 | `-o`, `--output-format` | `yaml` (default) or `json` |
-| `-k`, `--insecure` | Skip TLS certificate verification |
+| `-k`, `--insecure` | Skip HTTP TLS certificate verification |
 | `-v`, `--verbose` | Print request and response details to stderr |
 | `--cert` | Client certificate file for mTLS |
 | `--key` | Client private key file for mTLS (optional if cert file contains both) |
-| `--timeout` | HTTP request timeout in seconds (default: 30) |
+| `--timeout` | HTTP request timeout or gRPC deadline in seconds (default: 30) |
 | `--list-methods` | List available method names for `-m` and exit |
 | `--version` | Print the code version and exit |
 
@@ -64,6 +72,44 @@ For GET methods (GetConfig, GetVersion), input files can be omitted:
 ```
 otgctl -m GetVersion
 ```
+
+### gRPC transport
+
+Use a `grpc://host:port` server URL to select plaintext gRPC:
+
+```
+otgctl -s grpc://otg-server:40051 -m GetVersion
+otgctl -s grpc://otg-server:40051 config.yaml
+otgctl -s grpc://otg-server:40051 -m GetMetrics //flow -o json
+otgctl -s grpc://otg-server:40051 -m GetStates //ipv4_neighbors
+otgctl -s grpc://otg-server:40051 -m GetCapture capture_request.yaml > capture.pcap
+```
+
+`OTG_API` can also contain a `grpc://` URL. Method names, operation IDs,
+known REST paths, and explicit verb/path pairs select the corresponding RPC.
+Custom HTTP endpoints have no gRPC equivalent.
+
+Each input entry sends exactly one unary RPC, in order, over a shared channel.
+There are no automatic configuration reads, merges, or version checks.
+Requests use the same bodies as HTTP. `GetConfig` and `GetVersion` use empty
+requests. Capture responses are written as raw bytes when stdout is redirected.
+Structured responses use protobuf JSON conventions, including strings for
+64-bit integer fields.
+
+gRPC can send only methods and fields supported by the installed snappi schema.
+Unknown fields in YAML/JSON requests are rejected before sending the RPC.
+Unknown textproto fields are omitted with a warning, as described below.
+The `//foo` shorthand includes the selected empty object:
+`{"choice": "foo", "foo": {}}`. This makes `GetMetrics //flow` and
+`GetStates //ipv4_neighbors` work with both transports when the corresponding
+resources are configured. YAML/JSON bodies are sent as supplied; include the
+selected object explicitly when the server requires it.
+The client accepts unary responses up to 64 MiB; streaming RPCs are not selected
+automatically. `--timeout` sets a deadline for each RPC.
+
+TLS gRPC (`grpcs://`), `--cert`, and `--key` are not supported for this
+transport. `-k` and `OTG_INSECURE` only affect HTTP certificate verification;
+`grpc://` always uses plaintext.
 
 ### Environment Variables
 
@@ -76,9 +122,9 @@ otgctl -m GetVersion
 
 Exit codes:
 
-- `0`: all requests completed with 2xx HTTP status.
+- `0`: all requests completed with 2xx HTTP status or gRPC OK status.
 - `1`: input parsing failed, method resolution failed, request execution
-  failed, or an HTTP response was non-2xx.
+  failed, an HTTP response was non-2xx, or an RPC returned a gRPC error.
 - `2`: command-line usage error from argparse.
 
 ### Input formats
@@ -131,12 +177,22 @@ pip install 'otgctl[snappi]'
 otgctl -s https://otg-server:8443 -m SetConfig config.textproto
 ```
 
-For example, a `SetConfigRequest` textproto contains a top-level `config`
-field. otgctl removes that request wrapper before sending the REST body, so
-the REST request contains the contents of `config` rather than a nested
-`config` property. If strict parsing fails because the installed `snappi`
-schema is older than the input, otgctl retries with unknown fields allowed and
-prints a warning.
+Textproto files must use the protobuf request message for the selected method.
+For example, `SetConfig` input includes a top-level `config` field:
+
+```textproto
+config {
+  ports { name: "p1" location: "eth1" }
+}
+```
+
+Fields unknown to the installed snappi schema cannot be sent from textproto
+input. otgctl prints a warning and omits those fields, for both HTTP and gRPC.
+Upgrade snappi to send fields introduced in a newer schema.
+
+gRPC transport requires a compatible snappi schema for every input format.
+HTTP transport can send newer fields without snappi validation when using
+YAML or JSON input.
 
 #### 4. API path
 
@@ -177,7 +233,7 @@ port:
 
 Keys ending in "s" always produce a list, even with a single value (matching the OTG API convention where plural property names are arrays). Non-plural keys with commas also produce a list.
 
-A simple string will result in just a "choice", e.g.,
+A path ending in a choice includes an empty object for that choice, e.g.,
 ```
 otgctl -m GetMetrics //flow
 ```
@@ -186,7 +242,11 @@ Produces:
 
 ```yaml
 choice: flow
+flow: {}
 ```
+
+This also applies to nested choices: `//traffic/flow_transmit` produces
+`{"choice": "traffic", "traffic": {"choice": "flow_transmit", "flow_transmit": {}}}`.
 
 The `//` prefix distinguishes an API path from a file path, so there is no ambiguity with files that start with `/`.
 
@@ -237,9 +297,12 @@ Non-2xx HTTP responses include the status code in the output. Binary responses (
 otgctl -m GetCapture capture_request.yaml > capture.pcap
 ```
 
+gRPC failures print the gRPC status and server error details to stderr and stop
+processing subsequent entries with exit code 1.
+
 ## mTLS
 
-For servers requiring mutual TLS authentication:
+For HTTP servers requiring mutual TLS authentication:
 
 ```
 otgctl --cert client.crt --key client.key -s https://otg-server:8443 config.yaml

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from otgctl.methods import METHOD_MAP, resolve_method
+from otgctl.methods import METHOD_MAP, OPERATION_ID_MAP, resolve_grpc_method, resolve_method
 
 
 class TestGrpcToRest:
@@ -84,3 +84,19 @@ class TestUnknownMethod:
     def test_unknown_rest_path(self) -> None:
         with pytest.raises(ValueError, match="Unknown REST path"):
             resolve_method("/nonexistent/path")
+
+
+@pytest.mark.parametrize("name", METHOD_MAP)
+def test_grpc_method_aliases(name):
+    verb, path = METHOD_MAP[name]
+    assert resolve_grpc_method(name) == name
+    assert resolve_grpc_method(f"{verb} {path}") == name
+    alias = next(alias for alias, canonical in OPERATION_ID_MAP.items() if canonical == name)
+    assert resolve_grpc_method(alias) == name
+
+
+def test_grpc_path_and_unknown_http_operation():
+    assert resolve_grpc_method("/config") == "SetConfig"
+    assert resolve_grpc_method("get /config") == "GetConfig"
+    with pytest.raises(ValueError, match="No gRPC equivalent"):
+        resolve_grpc_method("DELETE /custom/endpoint")

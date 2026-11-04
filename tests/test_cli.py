@@ -202,6 +202,27 @@ class TestCliApiPath:
         }
 
 
+@pytest.mark.parametrize("method,choice,path,response", [
+    ("GetMetrics", "flow", "/monitor/metrics", {
+        "choice": "flow_metrics", "flow_metrics": [{"name": "f1", "frames_tx": "0"}],
+    }),
+    ("GetStates", "ipv4_neighbors", "/monitor/states", {
+        "choice": "ipv4_neighbors", "ipv4_neighbors": [{
+            "ethernet_name": "ethernet1", "ipv4_address": "192.0.2.2",
+        }],
+    }),
+])
+def test_http_choice_only_shorthand(method, choice, path, response, capsys):
+    with mock.patch("otgctl.client.requests.request") as request:
+        request.return_value = make_mock_response(body=response)
+        main(["-s", "https://example.test:8443", "-k", "-m", method,
+              "//" + choice, "-o", "json"])
+    request.assert_called_once_with(
+        "POST", "https://example.test:8443" + path,
+        timeout=30.0, verify=False, json={"choice": choice, choice: {}})
+    assert json.loads(capsys.readouterr().out) == response
+
+
 class TestCliOutputFormat:
     @mock.patch("otgctl.client.requests.request")
     def test_yaml_output(

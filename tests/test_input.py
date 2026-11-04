@@ -98,15 +98,16 @@ class TestApiPath:
         result = parse_api_path("/choice=a,b")
         assert result == {"choice": ["a", "b"]}
 
-    def test_path_only_single(self) -> None:
-        result = parse_api_path("/flow")
-        assert result == {"choice": "flow"}
+    @pytest.mark.parametrize("choice", ["flow", "ipv4_neighbors"])
+    def test_path_only_single(self, choice: str) -> None:
+        result = parse_api_path("//" + choice)
+        assert result == {"choice": choice, choice: {}}
 
     def test_path_only_nested(self) -> None:
         result = parse_api_path("/traffic/flow_transmit")
         assert result == {
             "choice": "traffic",
-            "traffic": {"choice": "flow_transmit"},
+            "traffic": {"choice": "flow_transmit", "flow_transmit": {}},
         }
 
     def test_empty_raises(self) -> None:
@@ -251,7 +252,7 @@ class TestApiPathInput:
     def test_path_only_api_path(self) -> None:
         entries = load_inputs(["//flow"], method_override="GetMetrics")
         assert len(entries) == 1
-        assert entries[0] == ("GetMetrics", {"choice": "flow"})
+        assert entries[0] == ("GetMetrics", {"choice": "flow", "flow": {}})
 
 
 class TestStdin:

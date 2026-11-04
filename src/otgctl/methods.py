@@ -87,3 +87,12 @@ def resolve_method(method_str: str) -> tuple[str, str]:
         f"Expected a gRPC method name ({', '.join(METHOD_MAP)}), "
         f"a REST path, or 'VERB /path'."
     )
+
+
+def resolve_grpc_method(method_str: str) -> str:
+    """Resolve the existing method spellings to a supported RPC name."""
+    operation = resolve_method(method_str)
+    for name, http_operation in METHOD_MAP.items():
+        if operation == http_operation:
+            return name
+    raise ValueError(f"No gRPC equivalent for {method_str}")

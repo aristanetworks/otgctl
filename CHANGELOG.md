@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Plaintext OTG gRPC transport through `grpc://host:port`, using the optional
+  snappi protobuf messages and generated stub. HTTP remains usable without snappi.
+- gRPC request deadlines, verbose output, server error reporting, and raw binary
+  capture output, with support for existing input formats and multi-document replay.
+- Regression tests for gRPC operations, schema validation, and HTTP operation
+  without optional dependencies; CI runs tests both without and with snappi.
+
+### Changed
+- Choice-only API paths such as `//flow` and `//ipv4_neighbors` include the selected
+  empty object (`{"choice": "flow", "flow": {}}`) for consistent HTTP and gRPC use.
+
 ## [0.9.2] - 2026-08-31
 
 ### Added

@@ -14,8 +14,21 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[1] / "src"
-sys.path.insert(0, str(SRC))
+if os.environ.get("OTGCTL_TEST_INSTALLED") == "1":
+    import otgctl
+    import pytest
+
+    package_path = Path(otgctl.__file__).resolve()
+    if (
+        not package_path.is_relative_to(Path(sys.prefix).resolve())
+        or package_path.is_relative_to(SRC.resolve())
+    ):
+        raise pytest.UsageError(
+            f"Expected otgctl installed in {sys.prefix}, imported {package_path}")
+else:
+    sys.path.insert(0, str(SRC))

@@ -93,6 +93,9 @@ def parse_api_path(s: str) -> dict[str, Any]:
         '//port/port_names=Ethernet1,Ethernet2;column_names=tx' becomes:
             {'choice': 'port', 'port': {'port_names': ['Ethernet1', 'Ethernet2'],
              'column_names': ['tx']}}
+
+        '//flow' becomes:
+            {'choice': 'flow', 'flow': {}}
     """
     s = s.lstrip("/")
     parts = s.split("/")
@@ -106,7 +109,7 @@ def parse_api_path(s: str) -> dict[str, Any]:
         result = _parse_leaf(parts[-1])
         wrap = parts[:-1]
     else:
-        result = {"choice": parts[-1]}
+        result = {"choice": parts[-1], parts[-1]: {}}
         wrap = parts[:-1]
 
     for part in reversed(wrap):

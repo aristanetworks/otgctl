@@ -19,13 +19,16 @@ import importlib.metadata
 import math
 import os
 import sys
+from typing import Any
+from urllib.parse import urlsplit
 
 import requests
 import yaml
 
 from otgctl.client import execute_request, format_response, print_response
+from otgctl.grpc_client import GrpcClient, format_grpc_response, grpc_target
 from otgctl.input import load_inputs
-from otgctl.methods import METHOD_MAP, resolve_method
+from otgctl.methods import METHOD_MAP, resolve_grpc_method, resolve_method
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,7 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="otgctl",
         description=(
-            f"otgctl {version} — Make OTG REST API calls from YAML, JSON, "
+            f"otgctl {version} — Make OTG REST or gRPC API calls from YAML, JSON, "
             "or protobuf text-format input."
         ),
     )
@@ -48,7 +51,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-s", "--server",
         default=os.environ.get("OTG_API", "https://localhost:8443"),
-        help="OTG server URL (default: $OTG_API or https://localhost:8443)",
+        help="OTG server URL (http://, https://, or grpc://host:port; "
+             "default: $OTG_API or https://localhost:8443)",
     )
     parser.add_argument(
         "-m", "--method",
@@ -65,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-k", "--insecure",
         default=insecure not in ('false', 'f', '0'),
         action="store_true",
-        help="Skip TLS certificate verification",
+        help="Skip HTTP TLS certificate verification",
     )
     parser.add_argument(
         "--cert",
@@ -79,7 +83,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--timeout",
         type=_positive_timeout,
         default=30.0,
-        help="HTTP request timeout in seconds (default: 30)",
+        help="HTTP request timeout or gRPC deadline in seconds (default: 30)",
     )
     parser.add_argument(
         "--list-methods",
@@ -101,7 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _positive_timeout(value: str) -> float:
-    """Parse a timeout that requests can use reliably."""
+    """Parse a positive, finite timeout for either transport."""
     try:
         timeout = float(value)
     except ValueError as e:
@@ -128,6 +132,16 @@ def main(argv: list[str] | None = None) -> None:
             print(f"{name:20s} {http_method:5s} {path}")
         sys.exit(0)
 
+    try:
+        scheme = urlsplit(args.server).scheme
+        use_grpc = scheme in ("grpc", "grpcs")
+        if use_grpc:
+            grpc_target(args.server)
+            if args.cert or args.key:
+                parser.error("--cert and --key are not supported with plaintext gRPC")
+    except ValueError as e:
+        parser.error(str(e))
+
     if not args.sources:
         if args.method:
             try:
@@ -152,6 +166,28 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
+    if use_grpc:
+        run_grpc(args, entries)
+    else:
+        run_rest(args, entries)
+
+
+def run_grpc(args: argparse.Namespace, entries: list[tuple[str, Any]]) -> None:
+    """Execute gRPC requests and print their responses."""
+    try:
+        with GrpcClient(args.server, args.timeout, args.verbose) as client:
+            for method_str, body in entries:
+                method = resolve_grpc_method(method_str)
+                response = client.execute(method, body)
+                text, binary = format_grpc_response(response, args.output_format)
+                print_response(text, binary)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def run_rest(args: argparse.Namespace, entries: list[tuple[str, Any]]) -> None:
+    """Execute HTTP requests and print their responses."""
     for method_str, body in entries:
         try:
             http_method, path = resolve_method(method_str)
